@@ -39,9 +39,6 @@ jobs:
       
       - name: 💻 Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
-        with:
-          ndk: '28.2.13676358'
-          build-tools: '35.0.0'
       
       - name: ⚙️ Grant execute permission to gradlew
         run: chmod +x gradlew
@@ -95,9 +92,6 @@ jobs:
       
       - name: 💻 Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
-        with:
-          ndk: '28.2.13676358'
-          build-tools: '35.0.0'
       
       - name: ⚙️ Grant execute permission to gradlew
         run: chmod +x gradlew
