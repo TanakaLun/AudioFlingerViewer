@@ -178,7 +178,7 @@ jobs:
           echo "Version Code: $VERSION_CODE"
           echo "Version Name: $VERSION_NAME"
       
-      -- name: 🛠️ Modify Gradle Build File
+      - name: 🛠️ Modify Gradle Build File
         run: |
           # 查找并修改 build.gradle.kts
           GRADLE_FILE="app/build.gradle.kts"
