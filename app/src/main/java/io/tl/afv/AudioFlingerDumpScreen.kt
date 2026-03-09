@@ -172,7 +172,7 @@ fun AudioFlingerDumpScreen() {
                             dumpResult = ""
                             
                             coroutineScope.launch {
-                                dumpResult = ShizukuCommandExecutor.getAudioFlingerInfo()
+                                dumpResult = ShizukuCommandExecutor.getAudioFlingerDump()
                                 isLoading = false
                             }
                         } else {
