@@ -178,24 +178,23 @@ jobs:
           echo "Version Code: $VERSION_CODE"
           echo "Version Name: $VERSION_NAME"
       
-      - name: 🛠️ Modify Gradle Build File
+      -- name: 🛠️ Modify Gradle Build File
         run: |
-          # 查找并修改 build.gradle
-          GRADLE_FILE="app/build.gradle"
+          # 查找并修改 build.gradle.kts
+          GRADLE_FILE="app/build.gradle.kts"
+          KOTLIN_FILE="app/src/main/kotlin/io/tl/RikoChi/logic/RikoChiLogic.kt"
           
           echo "Found gradle file: $GRADLE_FILE"
-            
-          # 备份原始文件
-          cp "$GRADLE_FILE" "${GRADLE_FILE}.bak"
-            
-          sed -i -E "s/versionCode[[:space:]]+[0-9]+/versionCode ${{ steps.version_info.outputs.version_code }}/g" "$GRADLE_FILE"
-          sed -i -E "s/versionName[[:space:]]+'[^']*'/versionName '${{ steps.version_info.outputs.version_name }}'/g" "$GRADLE_FILE"
-            
+                    
+          # 使用 sed 替换 versionCode 和 versionName
+          sed -i -E "s/versionCode[[:space:]]+[0-9]+/versionCode = ${{ steps.version_info.outputs.version_code }}/g" "$GRADLE_FILE"
+          sed -i -E "s/versionName[[:space:]]+'[^']*'/versionName = \"${{ steps.version_info.outputs.version_name }}\"/g" "$GRADLE_FILE"
+          
           echo "Modified versionCode to: ${{ steps.version_info.outputs.version_code }}"
           echo "Modified versionName to: ${{ steps.version_info.outputs.version_name }}"
-            
+          
           # 显示修改后的相关行
-          echo "Modified lines:"
+          echo "Modified lines in build.gradle.kts:"
           grep -n "versionCode\|versionName" "$GRADLE_FILE" || true
       
       - name: ⚙️ Grant execute permission to gradlew
