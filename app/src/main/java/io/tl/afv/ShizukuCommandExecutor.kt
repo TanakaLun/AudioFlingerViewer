@@ -11,11 +11,11 @@ import java.lang.reflect.Method
 
 object ShizukuCommandExecutor {
     
+    private const val TAG = "ShizukuExecutor"
     private var newProcessMethod: Method? = null
     
     init {
         try {
-            // 使用反射获取 newProcess 方法
             newProcessMethod = Shizuku::class.java.getDeclaredMethod(
                 "newProcess", 
                 Array<String>::class.java, 
@@ -24,7 +24,7 @@ object ShizukuCommandExecutor {
             )
             newProcessMethod?.isAccessible = true
         } catch (e: Exception) {
-            Log.e("AudioFlingerDump", "无法获取 newProcess 方法", e)
+            Log.e(TAG, "无法获取 newProcess 方法", e)
         }
     }
     
@@ -32,20 +32,24 @@ object ShizukuCommandExecutor {
         return try {
             newProcessMethod?.invoke(null, command, env, dir) as? ShizukuRemoteProcess
         } catch (e: Exception) {
-            Log.e("AudioFlingerDump", "创建进程失败", e)
+            Log.e(TAG, "创建进程失败", e)
             null
         }
     }
     
-    private suspend fun executeCommand(command: String): String = withContext(Dispatchers.IO) {
+    suspend fun executeDumpsysCommand(): String = withContext(Dispatchers.IO) {
         return@withContext try {
             if (!Shizuku.pingBinder()) {
                 return@withContext "Shizuku服务未运行"
             }
             
-            Log.d("AudioFlingerDump", "使用Shizuku执行命令: $command")
+            if (Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                return@withContext "Shizuku权限未授予"
+            }
             
-            val process = createProcess(arrayOf("sh", "-c", command), null, "/")
+            Log.d(TAG, "使用Shizuku执行命令: dumpsys media.audio_flinger")
+            
+            val process = createProcess(arrayOf("sh", "-c", "dumpsys media.audio_flinger"), null, "/")
             if (process == null) {
                 return@withContext "无法创建Shizuku进程"
             }
@@ -68,176 +72,105 @@ object ShizukuCommandExecutor {
                 }
             }
             
-            process.waitFor()
+            val exitCode = process.waitFor()
+            if (exitCode != 0) {
+                Log.w(TAG, "命令执行退出码: $exitCode")
+            }
+            
             result.toString()
             
         } catch (e: Exception) {
-            Log.e("AudioFlingerDump", "使用Shizuku执行命令失败", e)
+            Log.e(TAG, "使用Shizuku执行命令失败", e)
             "执行命令时出错: ${e.message}"
         }
     }
     
-    suspend fun executeDumpsysCommand(): String {
-        return executeCommand("dumpsys media.audio_flinger")
+    suspend fun executeAndParseAudioFlinger(): String = withContext(Dispatchers.IO) {
+        val rawOutput = executeDumpsysCommand()
+        
+        if (rawOutput.startsWith("Shizuku服务未运行") || 
+            rawOutput.startsWith("Shizuku权限未授予") || 
+            rawOutput.startsWith("执行命令时出错")) {
+            return@withContext rawOutput
+        }
+        
+        val parseResult = AudioFlingerParser.parse(rawOutput)
+        formatOutput(parseResult)
     }
     
-    suspend fun executeAndParseAudioFlinger(): String {
-        val rawOutput = executeCommand("dumpsys media.audio_flinger")
-        return parseAudioFlingerOutput(rawOutput)
+    private fun formatOutput(result: AudioFlingerParser.ParseResult): String {
+        val output = StringBuilder()
+        
+        if (result.error != null) {
+            output.appendLine("⚠️ 解析过程中出现错误")
+            output.appendLine(result.error)
+            return output.toString()
+        }
+        
+        if (result.tracks.isEmpty()) {
+            output.appendLine("📢 当前没有活跃的音频轨道")
+            output.appendLine("\n可能的原因:")
+            output.appendLine("• 没有应用在播放音频")
+            output.appendLine("• 音频系统处于待机状态")
+            output.appendLine("• 解析器需要调整以匹配系统输出格式")
+            
+            // 添加原始输出的前几行用于调试
+            output.appendLine("\n=== 调试信息 ===")
+            result.rawOutput.lines().take(20).forEach { line ->
+                if (line.isNotBlank()) {
+                    output.appendLine(line.take(200))
+                }
+            }
+            
+            return output.toString()
+        }
+        
+        output.appendLine("🎵 当前活跃音频轨道 (${result.tracks.size})\n")
+        
+        result.tracks.forEachIndexed { index, track ->
+            output.appendLine("【轨道 ${index + 1}】")
+            output.appendLine("📱 应用: ${track.packageName}")
+            output.appendLine("🆔 PID: ${track.pid} | UID: ${track.uid} | Session: ${track.sessionId}")
+            output.appendLine("")
+            
+            output.appendLine("   📝 请求规格 (应用请求):")
+            output.appendLine("   • 采样率: ${track.requestedSampleRate} Hz")
+            output.appendLine("   • 格式: ${track.getFormatDescription(track.requestedFormat)}")
+            output.appendLine("   • 通道: ${track.getChannelMaskDescription(track.requestedChannelMask)}")
+            output.appendLine("")
+            
+            output.appendLine("   🔊 播放规格 (实际输出):")
+            output.appendLine("   • 采样率: ${track.actualSampleRate} Hz")
+            output.appendLine("   • 格式: ${track.getFormatDescription(track.actualFormat)}")
+            output.appendLine("   • 通道: ${track.getChannelMaskDescription(track.actualChannelMask)} (${track.actualChannelCount}通道)")
+            output.appendLine("")
+            
+            output.appendLine("   ⚙️ 输出信息:")
+            output.appendLine("   • 线程: ${track.threadName}")
+            output.appendLine("   • 类型: ${track.getThreadTypeDescription(track.threadType)}")
+            output.appendLine("   • 设备: ${track.getDeviceDescription(track.outputDevice)}")
+            
+            if (index < result.tracks.size - 1) {
+                output.appendLine("\n" + "=".repeat(50) + "\n")
+            }
+        }
+        
+        // 添加统计信息
+        output.appendLine("\n📊 统计信息")
+        output.appendLine("-".repeat(30))
+        
+        val apps = result.tracks.groupBy { it.packageName }
+        output.appendLine("活跃应用数: ${apps.size}")
+        apps.forEach { (app, tracks) ->
+            output.appendLine("  • $app: ${tracks.size} 个轨道")
+        }
+        
+        val sampleRates = result.tracks.map { it.actualSampleRate }.distinct().sorted()
+        output.appendLine("\n使用的采样率: ${sampleRates.joinToString(", ")} Hz")
+        
+        val formats = result.tracks.map { track.getFormatDescription(track.actualFormat) }.distinct()
+        output.appendLine("使用的格式: ${formats.joinToString(", ")}")
+        
+        return output.toString()
     }
-    
-    private fun parseAudioFlingerOutput(rawOutput: String): String {
-        val result = StringBuilder()
-        result.appendLine("=== 音频应用播放信息 ===")
-        
-        if (rawOutput.contains("Shizuku服务未运行") || 
-            rawOutput.contains("无法创建Shizuku进程") || 
-            rawOutput.contains("执行命令时出错")) {
-            return rawOutput
-        }
-        
-        // 解析客户端信息
-        val clientMap = mutableMapOf<String, String>() // pid -> packageName
-        
-        // 解析Notification Clients部分
-        val notificationClientsSection = rawOutput.lines().dropWhile { 
-            !it.contains("Notification Clients:") 
-        }.takeWhile { 
-            it.isNotBlank() && !it.contains("Global session refs:") 
-        }
-        
-        notificationClientsSection.forEach { line ->
-            val trimmedLine = line.trim()
-            // 匹配格式: " 30548  10553  com.salt.music"
-            val clientPattern = """^\s*(\d+)\s+\d+\s+([\w\.]+)$""".toRegex()
-            val match = clientPattern.find(trimmedLine)
-            if (match != null) {
-                val (pid, packageName) = match.destructured
-                if (packageName.isNotBlank() && !packageName.startsWith("android.uid.")) {
-                    clientMap[pid] = packageName
-                    Log.d("AudioFlingerDump", "找到客户端: PID=$pid, 包名=$packageName")
-                }
-            }
-        }
-        
-        // 解析活跃的音频轨道
-        val activeTracks = mutableListOf<TrackInfo>()
-        
-        // 查找所有输出线程部分
-        val threadSections = rawOutput.split("Output thread").drop(1)
-        
-        threadSections.forEach { threadSection ->
-            // 检查线程是否处于活跃状态（非Standby）
-            if (!threadSection.contains("Standby: yes")) {
-                // 在线程中查找活跃轨道
-                val lines = threadSection.lines()
-                
-                // 查找活跃轨道表头
-                val tracksHeaderIndex = lines.indexOfFirst { 
-                    it.contains("Tracks of which") && it.contains("are active") 
-                }
-                
-                if (tracksHeaderIndex != -1 && tracksHeaderIndex + 1 < lines.size) {
-                    // 查找表头下面的数据行
-                    var dataLineIndex = tracksHeaderIndex + 1
-                    
-                    // 跳过列标题行（如果有）
-                    if (lines[dataLineIndex].contains("Type") || lines[dataLineIndex].contains("Id")) {
-                        dataLineIndex++
-                    }
-                    
-                    // 解析数据行直到空行或下一个节
-                    while (dataLineIndex < lines.size && 
-                           lines[dataLineIndex].isNotBlank() && 
-                           !lines[dataLineIndex].startsWith(" ") && 
-                           !lines[dataLineIndex].contains("Effect Chains")) {
-                        
-                        val line = lines[dataLineIndex].trim()
-                        
-                        // 匹配活跃轨道行
-                        val trackPattern = """^(\w+)\s+yes\s+(\d+)\s+\d+\s+\d+\s+\w\s+0x[0-9A-F]+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\d+)""".toRegex()
-                        val match = trackPattern.find(line)
-                        
-                        if (match != null) {
-                            val (trackId, clientPid, sampleRate) = match.destructured
-                            val packageName = clientMap[clientPid] ?: "未知应用(pid:$clientPid)"
-                            
-                            activeTracks.add(TrackInfo(
-                                packageName = packageName,
-                                trackId = trackId,
-                                clientPid = clientPid,
-                                sampleRate = sampleRate
-                            ))
-                            
-                            Log.d("AudioFlingerDump", "找到活跃轨道: 包名=$packageName, PID=$clientPid, 采样率=$sampleRate Hz")
-                        }
-                        
-                        dataLineIndex++
-                    }
-                }
-            }
-        }
-        
-        // 备选方案：如果上述方法没找到，尝试更宽松的搜索
-        if (activeTracks.isEmpty()) {
-            // 在整个输出中搜索活跃轨道模式
-            val relaxedPattern = """(\w+)\s+yes\s+(\d+)\s+\d+\s+\d+\s+\w\s+0x[0-9A-F]+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\d+)""".toRegex()
-            val matches = relaxedPattern.findAll(rawOutput)
-            
-            matches.forEach { match ->
-                val (trackId, clientPid, sampleRate) = match.destructured
-                val packageName = clientMap[clientPid] ?: "未知应用(pid:$clientPid)"
-                
-                // 避免重复添加
-                if (activeTracks.none { it.trackId == trackId && it.clientPid == clientPid }) {
-                    activeTracks.add(TrackInfo(
-                        packageName = packageName,
-                        trackId = trackId,
-                        clientPid = clientPid,
-                        sampleRate = sampleRate
-                    ))
-                    Log.d("AudioFlingerDump", "通过宽松搜索找到轨道: 包名=$packageName, PID=$clientPid, 采样率=$sampleRate Hz")
-                }
-            }
-        }
-        
-        if (activeTracks.isNotEmpty()) {
-            result.appendLine("发现 ${activeTracks.size} 个活跃音频轨道:\n")
-            
-            activeTracks.forEach { track ->
-                result.appendLine("应用包名: ${track.packageName}")
-                result.appendLine("进程PID: ${track.clientPid}")
-                result.appendLine("采样率: ${track.sampleRate} Hz")
-                result.appendLine("---")
-            }
-            
-            // 添加统计信息
-            result.appendLine("=== 统计信息 ===")
-            val sampleRates = activeTracks.map { it.sampleRate }.distinct().sorted()
-            result.appendLine("使用的采样率: ${sampleRates.joinToString(", ")} Hz")
-            
-            val appStats = activeTracks.groupBy { it.packageName }
-                .mapValues { it.value.size }
-                .toList()
-                .sortedByDescending { it.second }
-            
-            result.appendLine("\n应用使用统计:")
-            appStats.forEach { (app, count) ->
-                result.appendLine("  $app: $count 个活跃轨道")
-            }
-        } else {
-            result.appendLine("未找到活跃的音频轨道")
-            result.appendLine("\n=== 完整原始输出 ===")
-            result.appendLine(rawOutput)
-        }
-        
-        return result.toString()
-    }
-    
-    data class TrackInfo(
-        val packageName: String,
-        val trackId: String,
-        val clientPid: String,
-        val sampleRate: String
-    )
 }
