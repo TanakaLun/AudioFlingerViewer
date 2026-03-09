@@ -1,0 +1,342 @@
+name: Create Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'Version Code'
+        required: true
+        type: number
+      version_name:
+        description: 'Version Name'
+        required: true
+        type: string
+      release_title:
+        description: 'Release Title'
+        required: false
+        type: string
+        default: ''
+      include_debug:
+        description: 'Also Build Debug APK'
+        required: true
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Is prerelease'
+        required: true
+        type: boolean
+        default: false
+      custom_release_notes:
+        description: 'Release Info'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version_tag: ${{ steps.build-info.outputs.version_tag }}
+      release_title: ${{ steps.generate-title.outputs.release_title }}
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: 🛠️ Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 💻 Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: 📝 Generate Release Title
+        id: generate-title
+        run: |
+          if [[ -n "${{ github.event.inputs.release_title }}" ]]; then
+            TITLE="${{ github.event.inputs.release_title }}"
+          else
+            TODAY=$(date +'%Y年%m月%d日')
+            TITLE="Release v${{ github.event.inputs.version_name }} ($TODAY)"
+          fi
+          echo "release_title=$TITLE" >> $GITHUB_OUTPUT
+          echo "Generated title: $TITLE"
+
+      - name: 📝 Generate Release Notes
+        id: release-notes
+        run: |
+          if [[ -n "${{ github.event.inputs.custom_release_notes }}" ]]; then
+            NOTES="${{ github.event.inputs.custom_release_notes }}"
+          else
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            
+            if [[ -n "$LATEST_TAG" ]]; then
+              echo "Generating changes since $LATEST_TAG..."
+              CHANGES=$(git log --pretty=format:"* %s (%h) by %an" ${LATEST_TAG}..HEAD)
+              COMMITS_COUNT=$(git rev-list --count ${LATEST_TAG}..HEAD)
+              COMMIT_RANGE="${LATEST_TAG}..HEAD"
+            else
+              echo "No previous tag found, using all commits..."
+              CHANGES=$(git log --pretty=format:"* %s (%h) by %an" HEAD)
+              COMMITS_COUNT=$(git rev-list --count HEAD)
+              COMMIT_RANGE="all commits"
+            fi
+            
+            PRS=$(git log --grep="Merge pull request" --pretty=format:"* %s" | sed -E 's/Merge pull request #([0-9]+).*from.*/  * PR #\1/g')
+            
+            cat > release_notes.md << EOF
+            ## 🚀 AFV v${{ github.event.inputs.version_name }} (Build ${{ github.event.inputs.version_code }})
+            
+            ### 📦 下载说明
+            ${{ github.event.inputs.include_debug == 'true' && '* 📱 Debug APK: 包含调试信息，适用于开发测试' || '' }}
+            * 📱 Release APK: 正式版本，已签名优化
+            
+            ### ✨ 更新内容
+            ${{ github.event.inputs.include_debug == 'true' && '包括 Debug 和 Release 两种构建变体' || 'Release 构建版本' }}
+            
+            #### 📋 提交历史 (${COMMITS_COUNT} 个提交)
+            ${CHANGES:-* 无新提交}
+            
+            #### 🔀 合并的 Pull Requests
+            ${PRS:-* 无 PR 合并}
+            
+            ### ⚙️ 构建信息
+            * 版本代码: ${{ github.event.inputs.version_code }}
+            * 版本名称: ${{ github.event.inputs.version_name }}
+            * 构建日期: $(date +'%Y-%m-%d %H:%M:%S')
+            * 触发方式: 手动 Release 构建
+            * 提交范围: ${COMMIT_RANGE}
+            * 构建 ID: ${{ github.run_id }}
+            
+            ---
+            *由 GitHub Actions 自动构建*
+            EOF
+            
+            NOTES=$(cat release_notes.md)
+          fi
+          
+          # 将多行内容输出
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: ⚙️ Modify Gradle Build File
+        run: |
+          GRADLE_FILE="app/build.gradle.kts"
+          
+          echo "📝 Modifying gradle file: $GRADLE_FILE"
+          
+          # 备份原文件
+          cp "$GRADLE_FILE" "$GRADLE_FILE.bak"
+          
+          # 替换 versionCode 和 versionName
+          # 使用更灵活的正则表达式匹配各种格式
+          sed -i -E "s/versionCode[[:space:]]*=[[:space:]]*[0-9]+/versionCode = ${{ github.event.inputs.version_code }}/g" "$GRADLE_FILE"
+          sed -i -E "s/versionName[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]/versionName = \"${{ github.event.inputs.version_name }}\"/g" "$GRADLE_FILE"
+          
+          echo "✅ Modified versionCode to: ${{ github.event.inputs.version_code }}"
+          echo "✅ Modified versionName to: ${{ github.event.inputs.version_name }}"
+          
+          echo "📄 Modified lines in build.gradle.kts:"
+          grep -n "versionCode\|versionName" "$GRADLE_FILE" || true
+
+      - name: 🔑 Export Keystore Properties
+        run: |
+          # 从 Secrets 中解码 keystore 配置
+          if [[ -n "${{ secrets.KEYSTORE_PROPERTIES }}" ]]; then
+            echo "${{ secrets.KEYSTORE_PROPERTIES }}" | base64 -d > keystore.properties
+            echo "✅ Keystore properties extracted"
+          else
+            echo "⚠️ No keystore properties found, using debug signing"
+          fi
+          
+          # 解码 keystore 文件
+          if [[ -n "${{ secrets.KEYSTORE_FILE }}" ]]; then
+            echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > app/release.keystore
+            echo "✅ Keystore file extracted"
+          else
+            echo "⚠️ No keystore file found"
+          fi
+
+      - name: ⚙️ Grant execute permission to gradlew
+        run: chmod +x gradlew
+
+      - name: 🏗️ Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: 🏗️ Build Debug APK (Optional)
+        if: github.event.inputs.include_debug == 'true'
+        run: ./gradlew assembleDebug
+
+      - name: 📦 Prepare APK Files
+        id: build-info
+        run: |
+          mkdir -p release-assets
+          
+          # 处理 Release APK
+          RELEASE_APK=$(find app/build/outputs/apk/release -name "*.apk" ! -name "*unsigned*.apk" ! -name "*unaligned*.apk" | head -1)
+          if [[ -n "$RELEASE_APK" ]]; then
+            RELEASE_FILENAME="AFV-v${{ github.event.inputs.version_name }}-release.apk"
+            cp "$RELEASE_APK" "release-assets/$RELEASE_FILENAME"
+            echo "✅ Release APK prepared: $RELEASE_FILENAME"
+            
+            # 生成校验和
+            cd release-assets
+            sha256sum "$RELEASE_FILENAME" > "$RELEASE_FILENAME.sha256"
+            cd ..
+          else
+            echo "❌ Release APK not found!"
+            exit 1
+          fi
+          
+          # 处理 Debug APK（如果构建了）
+          if [[ "${{ github.event.inputs.include_debug }}" == "true" ]]; then
+            DEBUG_APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+            if [[ -n "$DEBUG_APK" ]]; then
+              DEBUG_FILENAME="AFV-v${{ github.event.inputs.version_name }}-debug.apk"
+              cp "$DEBUG_APK" "release-assets/$DEBUG_FILENAME"
+              echo "✅ Debug APK prepared: $DEBUG_FILENAME"
+              
+              # 生成校验和
+              cd release-assets
+              sha256sum "$DEBUG_FILENAME" > "$DEBUG_FILENAME.sha256"
+              cd ..
+            fi
+          fi
+          
+          # 创建版本标签名
+          echo "version_tag=v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}" >> $GITHUB_OUTPUT
+          
+          # 列出准备好的文件
+          echo "📊 Release assets:"
+          ls -la release-assets/
+
+      - name: 🏷️ Create Git Tag
+        env:
+          TAG_NAME: v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # 检查标签是否已存在
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "⚠️ Tag $TAG_NAME already exists, deleting old tag..."
+            git tag -d "$TAG_NAME"
+            git push --delete origin "$TAG_NAME" 2>/dev/null || true
+          fi
+          
+          # 创建新标签
+          git tag -a "$TAG_NAME" -m "Release v${{ github.event.inputs.version_name }} (Build ${{ github.event.inputs.version_code }})"
+          git push origin "$TAG_NAME"
+          echo "✅ Created and pushed tag: $TAG_NAME"
+
+      - name: 🚀 Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}
+        run: |
+          # 创建 Release
+          echo "📝 Creating release: $TAG_NAME"
+          
+          RELEASE_ARGS=(
+            --repo "${{ github.repository }}"
+            --tag "$TAG_NAME"
+            --target "${{ github.sha }}"
+            --title "${{ steps.generate-title.outputs.release_title }}"
+            --notes "${{ steps.release-notes.outputs.notes }}"
+          )
+          
+          if [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
+            RELEASE_ARGS+=(--prerelease)
+          fi
+          
+          # 创建 release
+          gh release create "${RELEASE_ARGS[@]}"
+          echo "✅ Release created"
+          
+          # 上传 assets
+          if [[ -d "release-assets" ]]; then
+            for asset in release-assets/*; do
+              if [[ -f "$asset" ]]; then
+                echo "📤 Uploading: $(basename "$asset")"
+                gh release upload "$TAG_NAME" "$asset" --repo "${{ github.repository }}" --clobber
+              fi
+            done
+            echo "✅ All assets uploaded"
+          fi
+
+      - name: 📊 Generate Summary
+        run: |
+          echo "## ✅ Release Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Release Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Release Tag** | \`${{ steps.build-info.outputs.version_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Release Title** | ${{ steps.generate-title.outputs.release_title }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version Name** | ${{ github.event.inputs.version_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version Code** | ${{ github.event.inputs.version_code }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Build Type** | ${{ github.event.inputs.include_debug == 'true' && 'Release + Debug' || 'Release Only' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Pre-release** | ${{ github.event.inputs.prerelease }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📦 Included Assets" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ -d "release-assets" ]]; then
+            for asset in release-assets/*; do
+              if [[ -f "$asset" ]]; then
+                filename=$(basename "$asset")
+                filesize=$(ls -lh "$asset" | awk '{print $5}')
+                filetype=$(file -b "$asset" | cut -d',' -f1)
+                echo "* **\`$filename\`** - $filesize ($filetype)" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "* [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.build-info.outputs.version_tag }})" >> $GITHUB_STEP_SUMMARY
+          echo "* [View Build Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Build completed at $(date +'%Y-%m-%d %H:%M:%S')*" >> $GITHUB_STEP_SUMMARY
+
+  notify-failure:
+    needs: build-and-release
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⚠️ Failure Notification
+        run: |
+          echo "## ❌ Release Build Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Error Details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The release build for version **v${{ github.event.inputs.version_name }}** (Code: ${{ github.event.inputs.version_code }}) failed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Workflow** | ${{ github.workflow }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Run ID** | ${{ github.run_id }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🛠️ Troubleshooting Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check the build logs for errors" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify that the keystore secrets are correctly set" >> $GITHUB_STEP_SUMMARY
+          echo "3. Ensure the gradle build file is properly configured" >> $GITHUB_STEP_SUMMARY
+          echo "4. Try running the build again" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[View Build Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
