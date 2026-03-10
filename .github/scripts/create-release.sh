@@ -40,14 +40,6 @@ generate_release_notes() {
 ### 📦 Download
 * 📱 Release APK: Signed release version
 
-### ✨ Changes
-
-#### 📋 Commits (${COMMITS_COUNT})
-${CHANGES}
-
-#### 🔀 Pull Requests
-${PRS}
-
 ### ⚙️ Build Info
 * Version Code: ${VERSION_CODE}
 * Version Name: ${VERSION_NAME}
