@@ -72,12 +72,14 @@ jobs:
           else
             NOTES=$(./.github/scripts/create-release.sh generate-notes \
               "${{ github.event.inputs.version_name }}" \
-              "${{ github.event.inputs.version_code }}")
+              "${{ github.event.inputs.version_code }}" 2>/dev/null)
           fi
-          
-          echo 'notes<<EOF' >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
+            
+          {
+            echo 'notes<<EOF'
+            echo "$NOTES"
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
 
       - name: Modify gradle file
         run: |
