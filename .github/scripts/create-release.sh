@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-
+set -f 
 generate_release_notes() {
   local VERSION_NAME=$1
   local VERSION_CODE=$2
@@ -37,14 +37,10 @@ generate_release_notes() {
   cat << EOF
 ## 🚀 RikoChi v${VERSION_NAME} (Build ${VERSION_CODE})
 
-### 📦 Download
-* 📱 Release APK: Signed release version
-
 ### ⚙️ Build Info
 * Version Code: ${VERSION_CODE}
 * Version Name: ${VERSION_NAME}
 * Build Date: $(date +'%Y-%m-%d %H:%M:%S')
-* Commit Range: ${COMMIT_RANGE}
 * Build ID: ${GITHUB_RUN_ID:-local}
 
 ---
