@@ -70,16 +70,17 @@ jobs:
           if [[ -n "${{ github.event.inputs.custom_release_notes }}" ]]; then
             NOTES="${{ github.event.inputs.custom_release_notes }}"
           else
+            # Capture only stdout, stderr goes to console
             NOTES=$(./.github/scripts/create-release.sh generate-notes \
               "${{ github.event.inputs.version_name }}" \
               "${{ github.event.inputs.version_code }}" 2>/dev/null)
           fi
             
-          {
-            echo 'notes<<EOF'
-            echo "$NOTES"
-            echo 'EOF'
-          } >> $GITHUB_OUTPUT
+           # Write to GITHUB_OUTPUT using a delimiter
+          DELIMITER=EOF-$(date +%s)
+          echo "notes<<$DELIMITER" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "$DELIMITER" >> $GITHUB_OUTPUT
 
       - name: Modify gradle file
         run: |
