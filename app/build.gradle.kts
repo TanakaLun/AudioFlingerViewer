@@ -70,8 +70,6 @@ android {
     buildFeatures {
         compose = true
     }
-
-    // 注意：在使用了 kotlin-compose 插件后，通常不再需要手动指定 composeOptions 的编译器版本
     
     packaging {
         resources {
