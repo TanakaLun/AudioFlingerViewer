@@ -2,6 +2,8 @@ name: Build AudioFlingerViewer APK
 
 on:
   push:
+    paths-ignore:
+      - '.github/**'
   workflow_dispatch:
     inputs:
       build_all:
