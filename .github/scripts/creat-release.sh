@@ -37,10 +37,22 @@ generate_release_notes() {
   cat << EOF
 ## 🚀 RikoChi v${VERSION_NAME} (Build ${VERSION_CODE})
 
+### 📦 Download
+* 📱 Release APK: Signed release version
+
+### ✨ Changes
+
+#### 📋 Commits (${COMMITS_COUNT})
+${CHANGES}
+
+#### 🔀 Pull Requests
+${PRS}
+
 ### ⚙️ Build Info
 * Version Code: ${VERSION_CODE}
 * Version Name: ${VERSION_NAME}
 * Build Date: $(date +'%Y-%m-%d %H:%M:%S')
+* Commit Range: ${COMMIT_RANGE}
 * Build ID: ${GITHUB_RUN_ID:-local}
 
 ---
