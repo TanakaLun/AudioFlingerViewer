@@ -67,10 +67,13 @@ jobs:
       - name: Generate release notes
         id: notes
         run: |
-          NOTES=$(./.github/scripts/create-release.sh generate-notes \
-            "${{ github.event.inputs.version_name }}" \
-            "${{ github.event.inputs.version_code }}" \
-            "false")
+          if [[ -n "${{ github.event.inputs.custom_release_notes }}" ]]; then
+            NOTES="${{ github.event.inputs.custom_release_notes }}"
+          else
+            NOTES=$(./.github/scripts/create-release.sh generate-notes \
+              "${{ github.event.inputs.version_name }}" \
+              "${{ github.event.inputs.version_code }}")
+          fi
           
           echo 'notes<<EOF' >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
@@ -83,21 +86,13 @@ jobs:
             "${{ github.event.inputs.version_code }}" \
             "${{ github.event.inputs.version_name }}"
 
-      - name: Export keystore
-        run: |
-          if [[ -n "${{ secrets.KEYSTORE_PROPERTIES }}" ]]; then
-            echo "${{ secrets.KEYSTORE_PROPERTIES }}" | base64 -d > keystore.properties
-          fi
-          if [[ -n "${{ secrets.KEYSTORE_FILE }}" ]]; then
-            echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > app/release.keystore
-          fi
+      - name: Grant permission to gradlew
+        run: chmod +x gradlew
 
       - name: Build release
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease
+        run: ./gradlew assembleRelease
         env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g'"
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g"
 
       - name: Prepare assets
         id: assets
@@ -108,9 +103,10 @@ jobs:
             "${{ github.workspace }}"
 
       - name: Create tag
-        env:
-          TAG_NAME: v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}
         run: |
+          TAG_NAME="v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
@@ -128,25 +124,29 @@ jobs:
         run: |
           TAG_NAME="v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}"
           
-          RELEASE_ARGS=(
-            --repo "${{ github.repository }}"
-            --tag "$TAG_NAME"
-            --target "${{ github.sha }}"
-            --title "${{ steps.title.outputs.title }}"
-            --notes "${{ steps.notes.outputs.notes }}"
-          )
+          # Build command arguments
+          CMD="gh release create \"$TAG_NAME\""
           
-          if [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
-            RELEASE_ARGS+=(--prerelease)
-          fi
-          
-          gh release create "${RELEASE_ARGS[@]}"
-          
+          # Add assets
           for asset in release-assets/*; do
             if [[ -f "$asset" ]]; then
-              gh release upload "$TAG_NAME" "$asset" --repo "${{ github.repository }}" --clobber
+              CMD="$CMD \"$asset\""
             fi
           done
+          
+          # Add options
+          CMD="$CMD --repo \"${{ github.repository }}\""
+          CMD="$CMD --target \"${{ github.sha }}\""
+          CMD="$CMD --title \"${{ steps.title.outputs.title }}\""
+          CMD="$CMD --notes \"${{ steps.notes.outputs.notes }}\""
+          
+          if [[ "${{ github.event.inputs.prerelease }}" == "true" ]]; then
+            CMD="$CMD --prerelease"
+          fi
+          
+          # Execute command
+          echo "Executing: $CMD"
+          eval $CMD
 
       - name: Summary
         if: always()
@@ -157,4 +157,14 @@ jobs:
           echo "**Version:** ${{ github.event.inputs.version_name }} (Code: ${{ github.event.inputs.version_code }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Assets" >> $GITHUB_STEP_SUMMARY
-          ls -la release-assets/ | awk '{print "* " $9 " (" $5 " bytes)"}' >> $GITHUB_STEP_SUMMARY
+          if [[ -d "release-assets" ]]; then
+            for asset in release-assets/*; do
+              if [[ -f "$asset" ]]; then
+                filename=$(basename "$asset")
+                size=$(ls -lh "$asset" | awk '{print $5}')
+                echo "* \`$filename\` ($size)" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View Release](https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }})" >> $GITHUB_STEP_SUMMARY
