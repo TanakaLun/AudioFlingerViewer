@@ -19,10 +19,10 @@ android {
 
     defaultConfig {
         applicationId = "io.tl.afv"
-        minSdk = 30
-        targetSdk = 35
-        versionCode = 3
-        versionName = "3.0-stable"
+        minSdk = 33
+        targetSdk = 36
+        versionCode = 4
+        versionName = "tidal"
 
         ndk {
             abiFilters.add("arm64-v8a")
@@ -49,7 +49,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // 只有当文件存在时才应用签名配置
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -70,12 +69,16 @@ android {
     buildFeatures {
         compose = true
     }
-
-    // 注意：在使用了 kotlin-compose 插件后，通常不再需要手动指定 composeOptions 的编译器版本
     
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/LICENSE*"
+            excludes += "/META-INF/NOTICE*"
+            excludes += "/META-INF/*.kotlin_module"
+            excludes += "/kotlin/**"
+            excludes += "DebugProbesKt.bin"
         }
     }
 }

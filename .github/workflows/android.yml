@@ -99,6 +99,8 @@ jobs:
       
       - name: 🏗️ Build Debug APK
         run: ./gradlew assembleDebug
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g'"
       
       - name: 📦 Find APK file and rename
         id: build_info
@@ -202,6 +204,8 @@ jobs:
       
       - name: 🏗️ Build Release APK
         run: ./gradlew assembleRelease
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g'"
       
       - name: 📦 Find APK file and rename
         id: build_info
