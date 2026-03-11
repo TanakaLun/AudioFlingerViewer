@@ -15,12 +15,11 @@ generate_release_notes() {
   PRS=""
   
   if [[ -n "$LATEST_TAG" ]]; then
-    # Get commits since last tag - redirect stderr to /dev/null to avoid any error messages
-    CHANGES=$(git log --pretty=format:"* %s (%h) by %an" ${LATEST_TAG}..HEAD 2>/dev/null | head -50)
+    CHANGES=$(git log --pretty=format:"* %s (%h) by %an" ${LATEST_TAG}..HEAD -- 2>/dev/null | head -50)
     COMMITS_COUNT=$(git rev-list --count ${LATEST_TAG}..HEAD 2>/dev/null)
     COMMIT_RANGE="${LATEST_TAG}..HEAD"
   else
-    CHANGES=$(git log --pretty=format:"* %s (%h) by %an" HEAD 2>/dev/null | head -50)
+    CHANGES=$(git log --pretty=format:"* %s (%h) by %an" HEAD -- 2>/dev/null | head -50)
     COMMITS_COUNT=$(git rev-list --count HEAD 2>/dev/null)
     COMMIT_RANGE="all commits"
   fi
