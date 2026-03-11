@@ -35,7 +35,7 @@ generate_release_notes() {
   
   # Build the release notes line by line to avoid any formatting issues
   cat << EOF
-## 🚀 RikoChi v${VERSION_NAME} (Build ${VERSION_CODE})
+## 🚀 AFV ${VERSION_NAME} (Build ${VERSION_CODE})
 
 ### 📦 Download
 * 📱 Release APK: Signed release version
@@ -92,7 +92,7 @@ prepare_assets() {
   # Find and copy release APK
   RELEASE_APK=$(find ${WORKSPACE}/app/build/outputs/apk/release -name "*.apk" ! -name "*unsigned*.apk" ! -name "*unaligned*.apk" 2>/dev/null | head -1)
   if [[ -n "$RELEASE_APK" ]]; then
-    RELEASE_FILENAME="RikoChi-v${VERSION_NAME}-release.apk"
+    RELEASE_FILENAME="AFV-${VERSION_NAME}-release.apk"
     cp "$RELEASE_APK" "release-assets/${RELEASE_FILENAME}"
     echo "✅ Release APK: ${RELEASE_FILENAME}" >&2
     
@@ -105,13 +105,13 @@ prepare_assets() {
   # Find and copy mapping.txt
   MAPPING_FILE=$(find ${WORKSPACE}/app/build/outputs/mapping/release -name "mapping.txt" 2>/dev/null | head -1)
   if [[ -n "$MAPPING_FILE" ]]; then
-    MAPPING_FILENAME="mapping-v${VERSION_NAME}-${VERSION_CODE}.txt"
+    MAPPING_FILENAME="mapping-${VERSION_NAME}-${VERSION_CODE}.txt"
     cp "$MAPPING_FILE" "release-assets/${MAPPING_FILENAME}"
     echo "✅ Mapping file: ${MAPPING_FILENAME}" >&2
   fi
   
   # Output tag name for next steps
-  echo "version_tag=v${VERSION_NAME}-build${VERSION_CODE}" >> $GITHUB_OUTPUT
+  echo "version_tag=${VERSION_NAME}-build${VERSION_CODE}" >> $GITHUB_OUTPUT
 }
 
 # Main execution

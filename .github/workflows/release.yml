@@ -60,7 +60,7 @@ jobs:
             TITLE="${{ github.event.inputs.release_title }}"
           else
             TODAY=$(date +'%Y-%m-%d')
-            TITLE="Release v${{ github.event.inputs.version_name }} ($TODAY)"
+            TITLE="Release ${{ github.event.inputs.version_name }} ($TODAY)"
           fi
           echo "title=$TITLE" >> $GITHUB_OUTPUT
 
@@ -107,7 +107,7 @@ jobs:
 
       - name: Create tag
         run: |
-          TAG_NAME="v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}"
+          TAG_NAME="${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
           
           git config --global user.name 'github-actions[bot]'
@@ -118,14 +118,14 @@ jobs:
             git push --delete origin "$TAG_NAME" 2>/dev/null || true
           fi
           
-          git tag -a "$TAG_NAME" -m "Release v${{ github.event.inputs.version_name }} (Build ${{ github.event.inputs.version_code }})"
+          git tag -a "$TAG_NAME" -m "Release ${{ github.event.inputs.version_name }} (Build ${{ github.event.inputs.version_code }})"
           git push origin "$TAG_NAME"
 
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG_NAME="v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}"
+          TAG_NAME="${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}"
           
           # Build command arguments
           CMD="gh release create \"$TAG_NAME\""
@@ -156,7 +156,7 @@ jobs:
         run: |
           echo "## ✅ Release Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** \`v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ github.event.inputs.version_name }} (Code: ${{ github.event.inputs.version_code }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Assets" >> $GITHUB_STEP_SUMMARY
@@ -170,4 +170,4 @@ jobs:
             done
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 [View Release](https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }})" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ github.event.inputs.version_name }}-build${{ github.event.inputs.version_code }})" >> $GITHUB_STEP_SUMMARY
