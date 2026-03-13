@@ -109,7 +109,7 @@ object ShizukuCommandExecutor {
             val line = lines[i].trim()
             if (line.isBlank() || line.contains("Global session refs:")) break
             
-            // 匹配格式: "24000  10553  com.salt.music"
+            // 匹配格式: "24000  10553  package"
             val clientPattern = """^(\d+)\s+\d+\s+([\w\.]+)$""".toRegex()
             val match = clientPattern.find(line)
             if (match != null) {
