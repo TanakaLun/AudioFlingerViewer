@@ -1,10 +1,10 @@
 [versions]
-agp = "9.0.1"
+agp = "9.1.0"
 kotlin = "2.3.10"
-coreKtx = "1.17.0"
-lifecycleRuntimeKtx = "2.9.2"
-activityCompose = "1.11.0"
-composeBom = "2025.10.01"
+coreKtx = "1.18.0"
+lifecycleRuntimeKtx = "2.10.0"
+activityCompose = "1.13.0"
+composeBom = "2026.03.00"
 kotlinCoroutines = "1.10.2"
 shizuku = "13.1.5"
 
