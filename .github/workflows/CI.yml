@@ -60,7 +60,7 @@ jobs:
              echo "$PR_BODY" | grep -q "\[skip ci\]" || \
              echo "$PR_BODY" | grep -q "\[ci skip\]"; then
             echo "检测到跳过标记，CI 将被跳过"
-            SHOULD_RUN="false"
+            # SHOULD_RUN="false"
           fi
           
           echo "Event name: ${{ github.event_name }}"
