@@ -26,56 +26,52 @@ permissions:
   actions: read
 
 jobs:
-  check-skip-ci:
-    runs-on: ubuntu-latest
-    outputs:
-      should-run: ${{ steps.check.outputs.should-run }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+  # check-skip-ci:
+    # runs-on: ubuntu-latest
+    # outputs:
+      # should-run: ${{ steps.check.outputs.should-run }}
+    # steps:
+      # - name: Checkout
+        # uses: actions/checkout@v4
+        # with:
+          # fetch-depth: 1
       
-      - name: Check for [skip ci] or [ci skip]
-        id: check
-        run: |
-          SHOULD_RUN="true"
+      # - name: Check for [skip ci] or [ci skip]
+        # id: check
+        # run: |
+          # SHOULD_RUN="true"
           
-          if [[ "${{ github.event_name }}" == "push" ]]; then
-            COMMIT_MSG=$(git log -1 --pretty=%B)
-          else
-            COMMIT_MSG="${{ github.event.head_commit.message }}"
-          fi
+          # if [[ "${{ github.event_name }}" == "push" ]]; then
+            # COMMIT_MSG=$(git log -1 --pretty=%B)
+          # else
+            # COMMIT_MSG="${{ github.event.head_commit.message }}"
+          # fi
           
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_BODY="${{ github.event.pull_request.body }}"
+          # PR_TITLE="${{ github.event.pull_request.title }}"
+          # PR_BODY="${{ github.event.pull_request.body }}"
           
-          echo "Commit message: $COMMIT_MSG"
-          echo "PR title: $PR_TITLE"
+          # echo "Commit message: $COMMIT_MSG"
+          # echo "PR title: $PR_TITLE"
           
-          if echo "$COMMIT_MSG" | grep -q "\[skip ci\]" || \
-             echo "$COMMIT_MSG" | grep -q "\[ci skip\]" || \
-             echo "$PR_TITLE" | grep -q "\[skip ci\]" || \
-             echo "$PR_TITLE" | grep -q "\[ci skip\]" || \
-             echo "$PR_BODY" | grep -q "\[skip ci\]" || \
-             echo "$PR_BODY" | grep -q "\[ci skip\]"; then
-            echo "检测到跳过标记，CI 将被跳过"
-            # SHOULD_RUN="false"
-          fi
+          # if echo "$COMMIT_MSG" | grep -q "\[skip ci\]" || \
+             # echo "$COMMIT_MSG" | grep -q "\[ci skip\]" || \
+             # echo "$PR_TITLE" | grep -q "\[skip ci\]" || \
+             # echo "$PR_TITLE" | grep -q "\[ci skip\]" || \
+             # echo "$PR_BODY" | grep -q "\[skip ci\]" || \
+             # echo "$PR_BODY" | grep -q "\[ci skip\]"; then
+            # echo "检测到跳过标记，CI 将被跳过"
+            # # SHOULD_RUN="false"
+          # fi
           
-          echo "Event name: ${{ github.event_name }}"
-          echo "Actor: ${{ github.actor }}"
+          # echo "Event name: ${{ github.event_name }}"
+          # echo "Actor: ${{ github.actor }}"
           
-          echo "should-run=$SHOULD_RUN" >> $GITHUB_OUTPUT
-          echo "CI Operational Decisions: $SHOULD_RUN"
+          # echo "should-run=$SHOULD_RUN" >> $GITHUB_OUTPUT
+          # echo "CI Operational Decisions: $SHOULD_RUN"
           
   build-debug:
     runs-on: ubuntu-latest
-    if: |
-      needs.check-skip-ci.outputs.should-run == 'true' && 
-      (github.event_name == 'push' || 
-       github.event.inputs.build_all == 'both' || 
-       github.event.inputs.build_all == 'debug')
+    if: github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'debug'
     outputs:
       build_timestamp: ${{ steps.build_info.outputs.build_timestamp }}
     env:
@@ -179,11 +175,7 @@ jobs:
 
   build-release:
     runs-on: ubuntu-latest
-    if: |
-      needs.check-skip-ci.outputs.should-run == 'true' && 
-      (github.event_name == 'push' || 
-       github.event.inputs.build_all == 'both' || 
-       github.event.inputs.build_all == 'release')
+    if: github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'release'
     outputs:
       build_timestamp: ${{ steps.build_info.outputs.build_timestamp }}
     env:
