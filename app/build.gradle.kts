@@ -8,9 +8,9 @@ plugins {
 
 // 加载 keystore.properties
 val keystorePropertiesFile = rootProject.file("keystore.properties")
-val keystoreProperties = Properties()
+val keystoreProperties = java.util.Properties()
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -32,12 +32,12 @@ android {
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
             } else {
-                logger.warn("Warning: keystore.properties not found, release signing will not work")
+                println("Warning: keystore.properties not found, release signing will not work")
             }
         }
     }
