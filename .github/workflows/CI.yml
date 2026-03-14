@@ -167,7 +167,7 @@ jobs:
           echo "Found and renamed APK to: $NEW_APK_PATH"
       
       - name: 📤 Upload Debug APK Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: AudioFlingerViewer-debug-v${{ steps.version_info.outputs.version_code }}
           path: ${{ steps.build_info.outputs.apk_path }}
@@ -272,7 +272,7 @@ jobs:
           echo "Found and renamed APK to: $NEW_APK_PATH"
       
       - name: 📤 Upload Release APK Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: AudioFlingerViewer-release-v${{ steps.version_info.outputs.version_code }}
           path: ${{ steps.build_info.outputs.apk_path }}
