@@ -95,8 +95,7 @@ jobs:
     needs: check-skip-ci
     if: |
       needs.check-skip-ci.outputs.should-run == 'true' && 
-      (github.event.inputs.build_all == 'both' || 
-       github.event.inputs.build_all == 'release')
+      (github.event_name == 'push' || github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'debug')
     runs-on: ubuntu-latest
     outputs:
       build_timestamp: ${{ steps.build_info.outputs.build_timestamp }}
@@ -202,8 +201,7 @@ jobs:
     needs: check-skip-ci
     if: |
       needs.check-skip-ci.outputs.should-run == 'true' && 
-      (github.event.inputs.build_all == 'both' || 
-       github.event.inputs.build_all == 'release')
+      (github.event_name == 'push' || github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'release')
     runs-on: ubuntu-latest
     outputs:
       build_timestamp: ${{ steps.build_info.outputs.build_timestamp }}
