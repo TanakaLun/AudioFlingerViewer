@@ -32,7 +32,7 @@ jobs:
       # should-run: ${{ steps.check.outputs.should-run }}
     # steps:
       # - name: Checkout
-        # uses: actions/checkout@v4
+        # uses: actions/checkout@v6
         # with:
           # fetch-depth: 1
       
@@ -79,7 +79,7 @@ jobs:
       BUILD_TYPE: "debug"
     steps:
       - name: ⬇️ Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # 获取所有提交历史，用于计算版本号
       
@@ -184,7 +184,7 @@ jobs:
       GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g'"
     steps:
       - name: ⬇️ Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # 获取所有提交历史，用于计算版本号
       
