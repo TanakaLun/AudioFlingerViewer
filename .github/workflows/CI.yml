@@ -153,8 +153,8 @@ jobs:
           echo "Found gradle file: $GRADLE_FILE"
                     
           # 使用 sed 替换 versionCode 和 versionName
-          sed -i -E "s/versionCode = 1/versionCode = ${{ steps.version_info.outputs.version_code }}/g" "$GRADLE_FILE"
-          sed -i -E "s/versionName = \"1.0\"/versionName = \"${{ steps.version_info.outputs.version_name }}\"/g" "$GRADLE_FILE"
+          sed -i -E "s/^([[:space:]]*)versionCode[[:space:]]*=[[:space:]]*[0-9]+/\1versionCode = ${{ steps.version_info.outputs.version_code }}/" "$GRADLE_FILE"   
+          sed -i -E "s/^([[:space:]]*)versionName[[:space:]]*=[[:space:]]*\"[^\"]*\"/\1versionName = \"${{ steps.version_info.outputs.version_name }}\"/" "$GRADLE_FILE"
           
           echo "Modified versionCode to: ${{ steps.version_info.outputs.version_code }}"
           echo "Modified versionName to: ${{ steps.version_info.outputs.version_name }}"
