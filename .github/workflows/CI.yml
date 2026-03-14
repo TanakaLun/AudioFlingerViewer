@@ -86,18 +86,17 @@ jobs:
           fi
           
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "手动触发，确保运行"
             SHOULD_RUN="true"
           fi
           
           echo "should-run=$SHOULD_RUN" >> $GITHUB_OUTPUT
-
+          
   build-debug:
     needs: check-skip-ci
     if: |
       needs.check-skip-ci.outputs.should-run == 'true' && 
       (github.event.inputs.build_all == 'both' || 
-       github.event.inputs.build_all == 'debug')
+       github.event.inputs.build_all == 'release')
     runs-on: ubuntu-latest
     outputs:
       build_timestamp: ${{ steps.build_info.outputs.build_timestamp }}
