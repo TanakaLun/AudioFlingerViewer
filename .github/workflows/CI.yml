@@ -24,78 +24,8 @@ permissions:
   actions: read
 
 jobs:
-  check-skip-ci:
-    runs-on: ubuntu-latest
-    outputs:
-      should-run: ${{ steps.check.outputs.should-run }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-    
-      - name: Debug Info
-        run: |
-          echo "Event name: ${{ github.event_name }}"
-          echo "Actor: ${{ github.actor }}"
-          echo "Ref: ${{ github.ref }}"
-     
-      - name: Check for [skip ci] or [ci skip]
-        id: check
-        run: |
-          SHOULD_RUN="true"
-          
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            COMMIT_MSG=""
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            COMMIT_MSG=$(git log -1 --pretty=%B)
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            COMMIT_MSG="${{ github.event.pull_request.head.sha }}"
-            PR_TITLE="${{ github.event.pull_request.title }}"
-            PR_BODY="${{ github.event.pull_request.body }}"
-          else
-            COMMIT_MSG=""
-          fi
-        
-          echo "====================="
-          echo "Event type: ${{ github.event_name }}"
-          echo "Commit message: '$COMMIT_MSG'"
-          [[ -n "$PR_TITLE" ]] && echo "PR Title: '$PR_TITLE'"
-          echo "====================="
-        
-          if [[ -n "$COMMIT_MSG" ]]; then
-            if echo "$COMMIT_MSG" | grep -q "\[skip ci\]" || echo "$COMMIT_MSG" | grep -q "\[ci skip\]"; then
-              SHOULD_RUN="false"
-            fi
-          fi
-          
-          if [[ "${{ github.event_name }}" == "pull_request" && -n "$PR_TITLE" ]]; then
-            if echo "$PR_TITLE" | grep -q "\[skip ci\]" || echo "$PR_TITLE" | grep -q "\[ci skip\]"; then
-              SHOULD_RUN="false"
-            fi
-          fi
-        
-          if [[ "${{ github.event_name }}" == "pull_request" && -n "$PR_BODY" ]]; then
-            if echo "$PR_BODY" | grep -q "\[skip ci\]" || echo "$PR_BODY" | grep -q "\[ci skip\]"; then
-              SHOULD_RUN="false"
-            fi
-          fi
-          
-          if [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.actor }}" == "dependabot[bot]" ]]; then
-            SHOULD_RUN="false"
-          fi
-          
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            SHOULD_RUN="true"
-          fi
-          
-          echo "should-run=$SHOULD_RUN" >> $GITHUB_OUTPUT
-          
   build-debug:
-    needs: check-skip-ci
-    if: |
-      needs.check-skip-ci.outputs.should-run == 'true' && 
-      (github.event_name == 'push' || github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'debug')
+    if: (github.event_name == 'push' || github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'debug')
     runs-on: ubuntu-latest
     outputs:
       build_timestamp: ${{ steps.build_info.outputs.build_timestamp }}
@@ -197,10 +127,7 @@ jobs:
           retention-days: 7
 
   build-release:
-    needs: check-skip-ci
-    if: |
-      needs.check-skip-ci.outputs.should-run == 'true' && 
-      (github.event_name == 'push' || github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'release')
+    if: (github.event_name == 'push' || github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'release')
     runs-on: ubuntu-latest
     outputs:
       build_timestamp: ${{ steps.build_info.outputs.build_timestamp }}
