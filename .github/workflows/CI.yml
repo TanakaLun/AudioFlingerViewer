@@ -1,7 +1,9 @@
-name: CI Build
+name: Build AudioFlingerViewer APK
 
 on:
   push:
+    paths-ignore:
+      - '.github/**'
   workflow_dispatch:
     inputs:
       build_all:
@@ -25,8 +27,8 @@ permissions:
 
 jobs:
   build-debug:
-    if: (github.event_name == 'push' || github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'debug')
     runs-on: ubuntu-latest
+    if: github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'debug'
     outputs:
       build_timestamp: ${{ steps.build_info.outputs.build_timestamp }}
     env:
@@ -34,15 +36,15 @@ jobs:
       BUILD_TYPE: "debug"
     steps:
       - name: ⬇️ Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # 获取所有提交历史，用于计算版本号
       
       - name: 🛠️ Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '25'
       
       - name: 💻 Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
@@ -79,12 +81,13 @@ jobs:
         run: |
           # 查找并修改 build.gradle.kts
           GRADLE_FILE="app/build.gradle.kts"
+          KOTLIN_FILE="app/src/main/kotlin/io/tl/RikoChi/logic/RikoChiLogic.kt"
           
           echo "Found gradle file: $GRADLE_FILE"
                     
           # 使用 sed 替换 versionCode 和 versionName
-          sed -i -E "s/^([[:space:]]*)versionCode[[:space:]]*=[[:space:]]*[0-9]+/\1versionCode = ${{ steps.version_info.outputs.version_code }}/" "$GRADLE_FILE"   
-          sed -i -E "s/^([[:space:]]*)versionName[[:space:]]*=[[:space:]]*\"[^\"]*\"/\1versionName = \"${{ steps.version_info.outputs.version_name }}\"/" "$GRADLE_FILE"
+          sed -i -E "s/versionCode[[:space:]]+[0-9]+/versionCode = ${{ steps.version_info.outputs.version_code }}/g" "$GRADLE_FILE"
+          sed -i -E "s/versionName[[:space:]]+'[^']*'/versionName = \"${{ steps.version_info.outputs.version_name }}\"/g" "$GRADLE_FILE"
           
           echo "Modified versionCode to: ${{ steps.version_info.outputs.version_code }}"
           echo "Modified versionName to: ${{ steps.version_info.outputs.version_name }}"
@@ -92,13 +95,14 @@ jobs:
           # 显示修改后的相关行
           echo "Modified lines in build.gradle.kts:"
           grep -n "versionCode\|versionName" "$GRADLE_FILE" || true
-         
       
       - name: ⚙️ Grant execute permission to gradlew
         run: chmod +x gradlew
       
       - name: 🏗️ Build Debug APK
         run: ./gradlew assembleDebug
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g'"
       
       - name: 📦 Find APK file and rename
         id: build_info
@@ -110,7 +114,7 @@ jobs:
           echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
 
           ORIGINAL_APK_PATH=$(find ${{ github.workspace }}/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-          NEW_APK_NAME="AFV-${{ env.NATIVE_TARGET }}-${{ env.BUILD_TYPE }}-v${VERSION_CODE}-${COMMIT_SHORT}.apk"
+          NEW_APK_NAME="AudioFlingerViewer-${{ env.NATIVE_TARGET }}-${{ env.BUILD_TYPE }}-v${VERSION_CODE}-${COMMIT_SHORT}.apk"
           
           # 重命名 APK 文件
           NEW_APK_DIR=$(dirname "$ORIGINAL_APK_PATH")
@@ -120,15 +124,15 @@ jobs:
           echo "Found and renamed APK to: $NEW_APK_PATH"
       
       - name: 📤 Upload Debug APK Artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
-          name: AFV-debug-v${{ steps.version_info.outputs.version_code }}
+          name: AudioFlingerViewer-debug-v${{ steps.version_info.outputs.version_code }}
           path: ${{ steps.build_info.outputs.apk_path }}
           retention-days: 7
 
   build-release:
-    if: (github.event_name == 'push' || github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'release')
     runs-on: ubuntu-latest
+    if: github.event.inputs.build_all == 'both' || github.event.inputs.build_all == 'release'
     outputs:
       build_timestamp: ${{ steps.build_info.outputs.build_timestamp }}
     env:
@@ -137,15 +141,15 @@ jobs:
       GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g'"
     steps:
       - name: ⬇️ Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0  # 获取所有提交历史，用于计算版本号
       
       - name: 🛠️ Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '25'
       
       - name: 💻 Set up Android SDK and NDK
         uses: android-actions/setup-android@v3
@@ -182,12 +186,13 @@ jobs:
         run: |
           # 查找并修改 build.gradle.kts
           GRADLE_FILE="app/build.gradle.kts"
+          KOTLIN_FILE="app/src/main/kotlin/io/tl/RikoChi/logic/RikoChiLogic.kt"
           
           echo "Found gradle file: $GRADLE_FILE"
                     
           # 使用 sed 替换 versionCode 和 versionName
-          sed -i -E "s/versionCode = 1/versionCode = ${{ steps.version_info.outputs.version_code }}/g" "$GRADLE_FILE"
-          sed -i -E "s/versionName = \"1.0\"/versionName = \"${{ steps.version_info.outputs.version_name }}\"/g" "$GRADLE_FILE"
+          sed -i -E "s/versionCode[[:space:]]+[0-9]+/versionCode = ${{ steps.version_info.outputs.version_code }}/g" "$GRADLE_FILE"
+          sed -i -E "s/versionName[[:space:]]+'[^']*'/versionName = \"${{ steps.version_info.outputs.version_name }}\"/g" "$GRADLE_FILE"
           
           echo "Modified versionCode to: ${{ steps.version_info.outputs.version_code }}"
           echo "Modified versionName to: ${{ steps.version_info.outputs.version_name }}"
@@ -195,21 +200,14 @@ jobs:
           # 显示修改后的相关行
           echo "Modified lines in build.gradle.kts:"
           grep -n "versionCode\|versionName" "$GRADLE_FILE" || true
-         
       
       - name: ⚙️ Grant execute permission to gradlew
         run: chmod +x gradlew
-
-      - name: Export keystore.properties
-        run: |
-          echo "${{ secrets.PASSWORD }}" | base64 -d > keystore.properties
-          chmod -x keystore.properties
-          
-          echo "${{ secrets.KEY }}" | base64 -d > app/TanakaLun.keystore
-          chmod -x app/TanakaLun.keystore
-                
+      
       - name: 🏗️ Build Release APK
         run: ./gradlew assembleRelease
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g'"
       
       - name: 📦 Find APK file and rename
         id: build_info
@@ -221,7 +219,7 @@ jobs:
           echo "build_timestamp=$BUILD_TIMESTAMP" >> $GITHUB_OUTPUT
 
           ORIGINAL_APK_PATH=$(find ${{ github.workspace }}/app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
-          NEW_APK_NAME="AFV-${{ env.NATIVE_TARGET }}-${{ env.BUILD_TYPE }}-v${VERSION_CODE}-${COMMIT_SHORT}.apk"
+          NEW_APK_NAME="AudioFlingerViewer-${{ env.NATIVE_TARGET }}-${{ env.BUILD_TYPE }}-v${VERSION_CODE}-${COMMIT_SHORT}.apk"
           
           # 重命名 APK 文件
           NEW_APK_DIR=$(dirname "$ORIGINAL_APK_PATH")
@@ -231,8 +229,8 @@ jobs:
           echo "Found and renamed APK to: $NEW_APK_PATH"
       
       - name: 📤 Upload Release APK Artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
-          name: AFV-release-v${{ steps.version_info.outputs.version_code }}
+          name: AudioFlingerViewer-release-v${{ steps.version_info.outputs.version_code }}
           path: ${{ steps.build_info.outputs.apk_path }}
           retention-days: 7
