@@ -2,8 +2,6 @@ name: Build AudioFlingerViewer APK
 
 on:
   push:
-    paths-ignore:
-      - '.github/**'
   workflow_dispatch:
     inputs:
       build_all:
@@ -81,7 +79,6 @@ jobs:
         run: |
           # 查找并修改 build.gradle.kts
           GRADLE_FILE="app/build.gradle.kts"
-          KOTLIN_FILE="app/src/main/kotlin/io/tl/RikoChi/logic/RikoChiLogic.kt"
           
           echo "Found gradle file: $GRADLE_FILE"
                     
@@ -186,7 +183,6 @@ jobs:
         run: |
           # 查找并修改 build.gradle.kts
           GRADLE_FILE="app/build.gradle.kts"
-          KOTLIN_FILE="app/src/main/kotlin/io/tl/RikoChi/logic/RikoChiLogic.kt"
           
           echo "Found gradle file: $GRADLE_FILE"
                     

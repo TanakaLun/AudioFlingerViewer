@@ -8,3 +8,4 @@ updates:
       maven-dependencies:
         patterns:
           - "*"
+    open-pull-requests-limit: 1
