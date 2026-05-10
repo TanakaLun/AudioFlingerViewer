@@ -6,39 +6,19 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// 加载 keystore.properties
-val keystorePropertiesFile = rootProject.file("keystore.properties")
-val keystoreProperties = Properties()
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-}
-
 android {
     namespace = "io.tl.afv"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.tl.afv"
         minSdk = 33
-        targetSdk = 36
-        versionCode = 4
-        versionName = "tidal"
+        targetSdk = 37
+        versionCode = 7
+        versionName = "aotu"
 
         ndk {
             abiFilters.add("arm64-v8a")
-        }
-    }
-
-    signingConfigs {
-        create("release") {
-            if (keystorePropertiesFile.exists()) {
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-            } else {
-                logger.warn("Warning: keystore.properties not found, release signing will not work")
-            }
         }
     }
 
@@ -50,21 +30,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (keystorePropertiesFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
-            }
         }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_25
         targetCompatibility = JavaVersion.VERSION_25
-    }
-    
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget("25"))
-        }
     }
 
     buildFeatures {
@@ -82,6 +53,10 @@ android {
             excludes += "DebugProbesKt.bin"
         }
     }
+}
+
+kotlin {
+    jvmToolchain(25)
 }
 
 dependencies {
