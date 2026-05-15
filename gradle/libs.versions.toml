@@ -1,11 +1,11 @@
 [versions]
-agp = "9.2.0"
+agp = "9.2.1"
 kotlin = "2.3.21"
 coreKtx = "1.18.0"
 lifecycleRuntimeKtx = "2.10.0"
 activityCompose = "1.13.0"
-composeBom = "2026.04.01"
-kotlinCoroutines = "1.10.2"
+composeBom = "2026.05.00"
+kotlinCoroutines = "1.11.0"
 shizuku = "13.1.5"
 
 [plugins]
